@@ -146,8 +146,8 @@ class Barrier {
 };
 
 #else
-template <typename T> T CompareExchange64(T* destination, T new_value,
-    T comparand) {
+template <typename T> 
+T CompareExchange64(T* destination, T new_value, T comparand) {
   static_assert(sizeof(T) == 8,
       "CompareExchange64 only works on 64 bit values");
   ::__atomic_compare_exchange_n(destination, &comparand, new_value, false,
@@ -162,13 +162,22 @@ T* CompareExchange64Ptr(T** destination, T* new_value, T* comparand) {
   return comparand;
 }
 
-template <typename T> T CompareExchange32(T* destination, T new_value,
-    T comparand) {
+template <typename T> 
+T CompareExchange32(T* destination, T new_value, T comparand) {
   static_assert(sizeof(T) == 4,
       "CompareExchange32 only works on 32 bit values");
   ::__atomic_compare_exchange_n(destination, &comparand, new_value, false,
                                        __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
   return comparand;
+}
+
+//new exchange atomic function(s)
+//may need to fill in for 32 and ptr, but for now I'll just implement the one version
+template <typename T> 
+void Exchange64(T* destination, T new_value) {
+  static_assert(sizeof(T) == 8, "Exchange64 only works on 64 bit values");
+  T old_value = ::__atomic_exchange_n(destination, new_value, __ATOMIC_SEQ_CST);
+  //I dont think we want the old value for anything, so we are done
 }
 
 template <typename T> T FetchAdd64(T* destination, T add_value) {
