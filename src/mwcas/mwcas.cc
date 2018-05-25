@@ -374,8 +374,8 @@ uint64_t Descriptor::CondCAS(uint32_t word_index, uint64_t dirty_flag) {
   */
 
 retry:
-  uint64_t ret = CompareExchange64(w->address_, cond_descptr, w->old_value_);
-  if(IsCondCASDescriptorPtr(ret)) {
+  //uint64_t ret = CompareExchange64(w->address_, cond_descptr, w->old_value_);
+  if(IsCondCASDescriptorPtr(*w->address_)) {
     // Already a CondCAS descriptor (ie a WordDescriptor pointer)
     WordDescriptor* wd = (WordDescriptor*)CleanPtr(ret);
     RAW_CHECK(wd->address_ == w->address_, "wrong address");
@@ -396,14 +396,14 @@ retry:
         return dptr;
       }
     }
-
     // Retry this operation
     goto retry;
-  } else if(ret == w->old_value_) {
+  }
+  else {  //if(ret == w->old_value_) {
     uint64_t mwcas_descptr = SetFlags(this, kMwCASFlag | dirty_flag);
-    CompareExchange64(w->address_,
-        status_ == kStatusUndecided ? mwcas_descptr : w->old_value_,
-        cond_descptr);
+    Exchange64(w->address_, status_ == kStatusUndecided ? mwcas_descptr : w->old_value_);
+    //I think just doing this will mess up the rollback protocol
+    //CompareExchange64(w->address_, status_ == kStatusUndecided ? mwcas_descptr : w->old_value_, cond_descptr);
   }
 
   // ret could be a normal value or a pointer to a MwCAS descriptor
