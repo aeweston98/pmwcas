@@ -174,9 +174,9 @@ T CompareExchange32(T* destination, T new_value, T comparand) {
 //new exchange atomic function(s)
 //may need to fill in for 32 and ptr, but for now I'll just implement the one version
 template <typename T> 
-void Exchange64(T* destination, T new_value) {
+T Exchange64(T* destination, T new_value) {
   static_assert(sizeof(T) == 8, "Exchange64 only works on 64 bit values");
-  T old_value = ::__atomic_exchange_n(destination, new_value, __ATOMIC_SEQ_CST);
+  return ::__atomic_exchange_n(destination, new_value, __ATOMIC_SEQ_CST);
   //I dont think we want the old value for anything, so we are done
 }
 
