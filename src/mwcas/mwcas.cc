@@ -399,11 +399,12 @@ retry:
     // Retry this operation
     goto retry;
   }
-  else if(!IsMwCASDescriptorPtr(*w->address_)){  //if(ret == w->old_value_) {
+  else if(IsMwCASDescriptorPtr(*w->address_)) {
+
+  }
+  else if(ret == w->old_value_) { //our CAS was successful, move forward
     uint64_t mwcas_descptr = SetFlags(this, kMwCASFlag | dirty_flag);
-    Exchange64(w->address_, status_ == kStatusUndecided ? mwcas_descptr : w->old_value_);
-    //I think just doing this will mess up the rollback protocol
-    //CompareExchange64(w->address_, status_ == kStatusUndecided ? mwcas_descptr : w->old_value_, cond_descptr);
+    CompareExchange64(w->address_, status_ == kStatusUndecided ? mwcas_descptr : w->old_value_, cond_descptr);
   }
 
   // ret could be a normal value or a pointer to a MwCAS descriptor
