@@ -11,6 +11,9 @@
 #include "mwcas/mwcas.h"
 #include "util/atomics.h"
 
+#include <chrono>
+#include <thread>
+
 namespace pmwcas {
 
 bool MwCASMetrics::enabled = false;
@@ -354,24 +357,26 @@ inline uint32_t Descriptor::ReadPersistStatus() {
 /// a descriptor. Now A1=1, A2=4, an inconsistent state.
 uint64_t Descriptor::CondCAS(uint32_t word_index, uint64_t dirty_flag) {
 
+//auto t1 = std::chrono::high_resolution_clock::now();
+
   auto* w = &words_[word_index];
   uint64_t cond_descptr = SetFlags((uint64_t)w, kCondCASFlag);
 
 retry:
-  w->old_value_ = *(w->address_);
+  uint64_t val = *(w->address_);
 
-  if(IsCondCASDescriptorPtr(w->old_value_)) {
+  if(IsCondCASDescriptorPtr(val)) {
 condcasdescriptor:
-    WordDescriptor* wd = (WordDescriptor*)CleanPtr(ret);
+    WordDescriptor* wd = (WordDescriptor*)CleanPtr(val);
     RAW_CHECK(wd->address_ == w->address_, "wrong address");
     uint64_t dptr = SetFlags(wd->GetDescriptor(), kMwCASFlag | dirty_flag);
     uint64_t desired = *wd->status_address_ == kStatusUndecided ? dptr : wd->old_value_;
 
-    if(*(volatile uint64_t*)wd->address_ != ret) {
+    if(*(volatile uint64_t*)wd->address_ != val) {
       goto retry;
     }
-    auto rval = CompareExchange64(wd->address_, *wd->status_address_ == kStatusUndecided ? dptr : wd->old_value_, ret);
-    if(rval == ret) {
+    auto rval = CompareExchange64(wd->address_, *wd->status_address_ == kStatusUndecided ? dptr : wd->old_value_, val);
+    if(rval == val) {
       if(desired == dptr) {
         // Another competing operation succeeded, return
         return dptr;
@@ -381,14 +386,16 @@ condcasdescriptor:
     goto retry;
   }
   
-  else if(IsMwCASDescriptorPtr(w->old_value_)) {
+  else if(IsMwCASDescriptorPtr(val)) {
 mwcasdescriptor:
     //wait for it to finish then retry
     //doesn't this keep the thread spinning?
+    std::this_thread::sleep_for(std::chrono::nanoseconds(5));
+    goto retry;
   }
   
   else {
-    uint64_t ret = CompareExchange64(w->address_, cond_descptr, w->old_value_);
+    uint64_t ret = CompareExchange64(w->address_, cond_descptr, val);
     
     if(ret == w->old_value_){
       //we have successfully installed the cond_descptr
@@ -409,8 +416,12 @@ mwcasdescriptor:
     }
   }
 
+auto t2 = std::chrono::high_resolution_clock::now();
+
+//std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(t2-t1).count()
+  //            << " nanoseconds  \n";
   // ret could be a normal value or a pointer to a MwCAS descriptor
-  return ret;
+  return val; 
 }
 
 #ifdef RTM
