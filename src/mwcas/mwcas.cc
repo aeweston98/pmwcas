@@ -357,7 +357,7 @@ inline uint32_t Descriptor::ReadPersistStatus() {
 /// a descriptor. Now A1=1, A2=4, an inconsistent state.
 uint64_t Descriptor::CondCAS(uint32_t word_index, uint64_t dirty_flag) {
 
-//auto t1 = std::chrono::high_resolution_clock::now();
+  //auto t1 = std::chrono::high_resolution_clock::now();
 
   auto* w = &words_[word_index];
   uint64_t cond_descptr = SetFlags((uint64_t)w, kCondCASFlag);
@@ -366,9 +366,9 @@ retry:
   uint64_t val = *(w->address_);
 
   if(IsCondCASDescriptorPtr(val)) {
+
 condcasdescriptor:
     WordDescriptor* wd = (WordDescriptor*)CleanPtr(val);
-    RAW_CHECK(wd->address_ == w->address_, "wrong address");
     uint64_t dptr = SetFlags(wd->GetDescriptor(), kMwCASFlag | dirty_flag);
     uint64_t desired = *wd->status_address_ == kStatusUndecided ? dptr : wd->old_value_;
 
@@ -404,6 +404,7 @@ mwcasdescriptor:
     }
 
     else if(IsCondCASDescriptorPtr(ret)){
+      val = ret;
       goto condcasdescriptor;
     }
 
@@ -416,10 +417,9 @@ mwcasdescriptor:
     }
   }
 
-auto t2 = std::chrono::high_resolution_clock::now();
+  //auto t2 = std::chrono::high_resolution_clock::now();
 
-//std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(t2-t1).count()
-  //            << " nanoseconds  \n";
+  //std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(t2-t1).count() << " nanoseconds  \n";
   // ret could be a normal value or a pointer to a MwCAS descriptor
   return val; 
 }
@@ -636,7 +636,7 @@ retry_entry:
     }
 
     // Do we need to help another MWCAS operation?
-    if(IsMwCASDescriptorPtr(rval)) {
+/*    if(IsMwCASDescriptorPtr(rval)) {
       if(rval & kDirtyFlag) {
         wd->PersistAddress();
         CompareExchange64(wd->address_, rval & ~kDirtyFlag, rval);
@@ -652,6 +652,7 @@ retry_entry:
       // rval must be another value, we failed
       my_status = kStatusFailed;
     }
+    */
   }
 #endif
 
