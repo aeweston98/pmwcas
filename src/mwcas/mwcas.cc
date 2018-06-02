@@ -353,43 +353,24 @@ inline uint32_t Descriptor::ReadPersistStatus() {
 /// installation for A2, however, will succeeded because it contains
 /// a descriptor. Now A1=1, A2=4, an inconsistent state.
 uint64_t Descriptor::CondCAS(uint32_t word_index, uint64_t dirty_flag) {
+
   auto* w = &words_[word_index];
   uint64_t cond_descptr = SetFlags((uint64_t)w, kCondCASFlag);
 
-  /*
-  Notes
-    we still have to do a check of the current value here, but instead of checking
-    against old value, we will just check it to make sure it isn't a pointer to 
-    a descriptor already. This is a very subtle difference, so I need to better
-    understand why the client takes the old_value in the first place and how the
-    descriptor is initialized. ie. for the purposes of rolling back, the descriptor
-    will still need the old value (we can get it from the result of our Exchange64 operation)
-
-    The only case I can see where this has any difference in performance/behaviour is if the 
-    old value the descriptor has is out of date, if so the current algorithm does nothing. 
-    But this shouldn't ever be the case, because if you have a shared data structure which points
-    to a block of memory, that has no inherent data until you load from the pointer address. And 
-    why would a load care if it had the correct old value, what is it comparing against, arent 
-    they pointed to the same thing?
-  */
-
 retry:
-  //uint64_t ret = CompareExchange64(w->address_, cond_descptr, w->old_value_);
-  if(IsCondCASDescriptorPtr(*w->address_)) {
-    // Already a CondCAS descriptor (ie a WordDescriptor pointer)
+  w->old_value_ = *(w->address_);
+
+  if(IsCondCASDescriptorPtr(w->old_value_)) {
+condcasdescriptor:
     WordDescriptor* wd = (WordDescriptor*)CleanPtr(ret);
     RAW_CHECK(wd->address_ == w->address_, "wrong address");
     uint64_t dptr = SetFlags(wd->GetDescriptor(), kMwCASFlag | dirty_flag);
-    uint64_t desired =
-      *wd->status_address_ == kStatusUndecided ? dptr : wd->old_value_;
+    uint64_t desired = *wd->status_address_ == kStatusUndecided ? dptr : wd->old_value_;
 
     if(*(volatile uint64_t*)wd->address_ != ret) {
       goto retry;
     }
-    auto rval = CompareExchange64(
-      wd->address_,
-      *wd->status_address_ == kStatusUndecided ? dptr : wd->old_value_,
-      ret);
+    auto rval = CompareExchange64(wd->address_, *wd->status_address_ == kStatusUndecided ? dptr : wd->old_value_, ret);
     if(rval == ret) {
       if(desired == dptr) {
         // Another competing operation succeeded, return
@@ -399,12 +380,33 @@ retry:
     // Retry this operation
     goto retry;
   }
-  else if(IsMwCASDescriptorPtr(*w->address_)) {
-
+  
+  else if(IsMwCASDescriptorPtr(w->old_value_)) {
+mwcasdescriptor:
+    //wait for it to finish then retry
+    //doesn't this keep the thread spinning?
   }
-  else if(ret == w->old_value_) { //our CAS was successful, move forward
-    uint64_t mwcas_descptr = SetFlags(this, kMwCASFlag | dirty_flag);
-    CompareExchange64(w->address_, status_ == kStatusUndecided ? mwcas_descptr : w->old_value_, cond_descptr);
+  
+  else {
+    uint64_t ret = CompareExchange64(w->address_, cond_descptr, w->old_value_);
+    
+    if(ret == w->old_value_){
+      //we have successfully installed the cond_descptr
+      uint64_t mwcas_descptr = SetFlags(this, kMwCASFlag | dirty_flag);
+      CompareExchange64(w->address_, status_ == kStatusUndecided ? mwcas_descptr : w->old_value_, cond_descptr);
+    }
+
+    else if(IsCondCASDescriptorPtr(ret)){
+      goto condcasdescriptor;
+    }
+
+    else if(IsMwCASDescriptorPtr(ret)){
+      goto mwcasdescriptor;
+    }
+
+    else{
+      goto retry; //this should never happen?
+    }
   }
 
   // ret could be a normal value or a pointer to a MwCAS descriptor
