@@ -266,12 +266,12 @@ uint32_t Descriptor::AddEntry(uint64_t* addr, uint64_t oldval, uint64_t newval,
       uint32_t recycle_policy) {
   // IsProtected() checks are quite expensive, use DCHECK instead of RAW_CHECK.
   DCHECK(owner_partition_->garbage_list->GetEpoch()->IsProtected());
-  DCHECK(IsCleanPtr(oldval));
+  //DCHECK(IsCleanPtr(oldval));
   DCHECK(IsCleanPtr(newval) || newval == kNewValueReserved);
   int insertpos = GetInsertPosition(addr);
   RAW_CHECK(insertpos >= 0, "invalid insert position");
   words_[insertpos].address_ = addr;
-  words_[insertpos].old_value_ = oldval;
+  //words_[insertpos].old_value_ = oldval;
   words_[insertpos].new_value_ = newval;
   words_[insertpos].status_address_ = &status_;
   words_[insertpos].recycle_policy_ = recycle_policy;
@@ -283,11 +283,11 @@ uint32_t Descriptor::AllocateAndAddEntry(uint64_t* addr, uint64_t oldval,
       size_t size, uint32_t recycle_policy) {
   // IsProtected() checks are quite expensive, use DCHECK instead of RAW_CHECK.
   DCHECK(owner_partition_->garbage_list->GetEpoch()->IsProtected());
-  DCHECK(IsCleanPtr(oldval));
+  //DCHECK(IsCleanPtr(oldval));
   int insertpos = GetInsertPosition(addr);
   RAW_CHECK(insertpos >= 0, "invalid insert position");
   words_[insertpos].address_ = addr;
-  words_[insertpos].old_value_ = oldval;
+  //words_[insertpos].old_value_ = oldval;
   words_[insertpos].new_value_ = (uint64_t)allocate_callback_(size);
   RAW_CHECK(words_[insertpos].new_value_, "allocation failed");
   words_[insertpos].status_address_ = &status_;
@@ -390,7 +390,7 @@ condcasdescriptor:
 mwcasdescriptor:
     //wait for it to finish then retry
     //doesn't this keep the thread spinning?
-    std::this_thread::sleep_for(std::chrono::nanoseconds(5));
+    //std::this_thread::sleep_for(std::chrono::nanoseconds(5));
     goto retry;
   }
   
@@ -408,12 +408,8 @@ mwcasdescriptor:
       goto condcasdescriptor;
     }
 
-    else if(IsMwCASDescriptorPtr(ret)){
-      goto mwcasdescriptor;
-    }
-
     else{
-      goto retry; //this should never happen?
+      goto retry;
     }
   }
 
