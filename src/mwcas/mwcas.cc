@@ -368,7 +368,7 @@ retry:
   if(IsCondCASDescriptorPtr(val)) {
 
 condcasdescriptor:
-    WordDescriptor* wd = (WordDescriptor*)CleanPtr(val);
+    /*WordDescriptor* wd = (WordDescriptor*)CleanPtr(val);
     uint64_t dptr = SetFlags(wd->GetDescriptor(), kMwCASFlag | dirty_flag);
     uint64_t desired = *wd->status_address_ == kStatusUndecided ? dptr : wd->old_value_;
 
@@ -382,6 +382,7 @@ condcasdescriptor:
         return dptr;
       }
     }
+	*/
     // Retry this operation
     goto retry;
   }
@@ -397,8 +398,9 @@ mwcasdescriptor:
   else {
     uint64_t ret = CompareExchange64(w->address_, cond_descptr, val);
     
-    if(ret == w->old_value_){
+    if(ret == val){
       //we have successfully installed the cond_descptr
+      w->old_value_ = val;
       uint64_t mwcas_descptr = SetFlags(this, kMwCASFlag | dirty_flag);
       CompareExchange64(w->address_, status_ == kStatusUndecided ? mwcas_descptr : w->old_value_, cond_descptr);
     }
