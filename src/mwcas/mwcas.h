@@ -94,6 +94,26 @@ class alignas(kCacheLineSize) Descriptor {
   template<typename T> friend class MwcTargetField;
 
 public:
+#if defined(__i386__)
+
+static __inline__ unsigned long long rdtsc(void)
+{
+    unsigned long long int x;
+    __asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
+    return x;
+}
+
+#elif defined(__x86_64__)
+
+static __inline__ unsigned long long rdtsc(void)
+{
+    unsigned hi, lo;
+    __asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));
+    return ( (unsigned long long)lo)|( ((unsigned long long)hi)<<32 );
+}
+
+#endif
+
   /// Signifies a dirty word requiring cache line write back
   static const uint64_t kDirtyFlag   = (uint64_t)1 << 61;
 
@@ -173,12 +193,12 @@ public:
   void Initialize();
 
   /// Executes the multi-word compare and swap operation.
-  bool MwCAS(uint32_t calldepth = 0) {
+  bool MwCAS(uint32_t calldepth = 0, std::stringstream * s = nullptr) {
     RAW_CHECK(status_ == kStatusFinished,
       "status of descriptor is not kStatusFinished");
     status_ = kStatusUndecided;
 #ifdef PMEM
-    return PersistentMwCAS(calldepth);
+    return PersistentMwCAS(calldepth, s);
 #else
     return VolatileMwCAS(calldepth);
 #endif
@@ -238,7 +258,7 @@ private:
   /// descriptor derived from one of words_, expecting the status_ field
   /// indicates Undecided. [dirty_flag] will be applied on the MwCAS descriptor
   /// address if specified.
-  uint64_t CondCAS(uint32_t word_index, uint64_t dirty_flag = 0);
+  uint64_t CondCAS(uint32_t word_index, uint64_t dirty_flag = 0, std::stringstream * s = nullptr);
 
   /// A version of the MwCAS function that will fail/abort during execution.
   /// This is a private function that should only be used for testing failure
@@ -273,7 +293,7 @@ private:
 
 #ifdef PMEM
   /// Execute the multi-word compare and swap operation on persistent memory.
-  bool PersistentMwCAS(uint32_t calldepth = 0);
+  bool PersistentMwCAS(uint32_t calldepth = 0, std::stringstream * s = nullptr);
 
   /// Persistent version of the multi-word CAS with failure injection.
   bool PersistentMwCASWithFailure(uint32_t calldepth = 0,

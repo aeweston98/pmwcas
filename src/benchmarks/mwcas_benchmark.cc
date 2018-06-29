@@ -194,7 +194,7 @@ struct MwCas : public Benchmark {
       duplicated;
   }
 
-  void Main(size_t thread_index) {
+  void Main(size_t thread_index, std::stringstream * ss = nullptr) {
     CasPtr* address[10] = {0,0,0,0,0,0,0,0,0,0};
     CasPtr value[10] = {0,0,0,0,0,0,0,0,0,0};
     RandomNumberGenerator rng(FLAGS_seed + thread_index, 0, FLAGS_array_size);
@@ -235,7 +235,7 @@ struct MwCas : public Benchmark {
             uint64_t(value[FLAGS_word_count - 1 - i] + 4 * FLAGS_array_size));
       }
       bool status = false;
-      status = descriptor->MwCAS();
+      status = descriptor->MwCAS(0,ss);
       n_success += (status == true);
     }
     descriptor_pool_->GetEpoch()->Unprotect();

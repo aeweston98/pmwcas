@@ -355,9 +355,7 @@ inline uint32_t Descriptor::ReadPersistStatus() {
 /// algo will think it's ok (assuming some other thread did it). The
 /// installation for A2, however, will succeeded because it contains
 /// a descriptor. Now A1=1, A2=4, an inconsistent state.
-uint64_t Descriptor::CondCAS(uint32_t word_index, uint64_t dirty_flag) {
-
-  //auto t1 = std::chrono::high_resolution_clock::now();
+uint64_t Descriptor::CondCAS(uint32_t word_index, uint64_t dirty_flag, std::stringstream * s) {
 
   auto* w = &words_[word_index];
   uint64_t cond_descptr = SetFlags((uint64_t)w, kCondCASFlag);
@@ -368,7 +366,7 @@ retry:
   if(IsCondCASDescriptorPtr(val)) {
 
 condcasdescriptor:
-    /*WordDescriptor* wd = (WordDescriptor*)CleanPtr(val);
+    WordDescriptor* wd = (WordDescriptor*)CleanPtr(val);
     uint64_t dptr = SetFlags(wd->GetDescriptor(), kMwCASFlag | dirty_flag);
     uint64_t desired = *wd->status_address_ == kStatusUndecided ? dptr : wd->old_value_;
 
@@ -382,7 +380,6 @@ condcasdescriptor:
         return dptr;
       }
     }
-	*/
     // Retry this operation
     goto retry;
   }
@@ -401,7 +398,10 @@ mwcasdescriptor:
     if(ret == val){
       //we have successfully installed the cond_descptr
       w->old_value_ = val;
-      uint64_t mwcas_descptr = SetFlags(this, kMwCASFlag | dirty_flag);
+	if(s != nullptr) {
+     		(*s) << w->address_ << "," << w->old_value_ << "," << w->new_value_ << "," << rdtsc() << "\n";
+	}
+	 uint64_t mwcas_descptr = SetFlags(this, kMwCASFlag | dirty_flag);
       CompareExchange64(w->address_, status_ == kStatusUndecided ? mwcas_descptr : w->old_value_, cond_descptr);
     }
 
@@ -415,9 +415,6 @@ mwcasdescriptor:
     }
   }
 
-  //auto t2 = std::chrono::high_resolution_clock::now();
-
-  //std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(t2-t1).count() << " nanoseconds  \n";
   // ret could be a normal value or a pointer to a MwCAS descriptor
   return val; 
 }
@@ -585,7 +582,7 @@ retry_entry:
 #endif
 
 #ifdef PMEM
-inline bool Descriptor::PersistentMwCAS(uint32_t calldepth) {
+inline bool Descriptor::PersistentMwCAS(uint32_t calldepth, std::stringstream * s) {
   DCHECK(owner_partition_->garbage_list->GetEpoch()->IsProtected());
 
   // Not visible to anyone else, persist before making the descriptor visible
@@ -623,7 +620,7 @@ inline bool Descriptor::PersistentMwCAS(uint32_t calldepth) {
   for(uint32_t i = 0; i < count_ && my_status == kStatusSucceeded; ++i) {
     WordDescriptor* wd = &words_[i];
 retry_entry:
-    auto rval = CondCAS(i, kDirtyFlag);
+    auto rval = CondCAS(i, kDirtyFlag, s);
 
     // Ok if a) we succeeded to swap in a pointer to this descriptor or b) some
     // other thread has already done so. Need to persist all fields (which point

@@ -202,7 +202,7 @@ struct DListBench : public Benchmark {
     }
   }
 
-  void Main(size_t thread_index) {
+  void Main(size_t thread_index, std::stringstream * ss = nullptr) {
     DllStats *local_stats = new DllStats;
     *stats.MyObject() = local_stats;
 

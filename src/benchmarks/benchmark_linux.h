@@ -8,7 +8,9 @@
 #include <vector>
 #include <deque>
 #include <thread>
-
+#include <sstream>
+#include <fstream>
+#include <iostream>
 #include "common/environment_internal.h"
 #include "util/macros.h"
 
@@ -37,7 +39,7 @@ class Benchmark {
   /// the benchmark.This gives Main() a chance to set up its stack without
   /// setup overhead being measured. Missing this call in a thread will
   /// result in deadlock.
-  virtual void Main(size_t thread_index) = 0;
+  virtual void Main(size_t thread_index, std::stringstream * s) = 0;
 
   /// Called during Run() before threads call Main(). Useful to initialize
   /// any state accessed during the test.
@@ -75,8 +77,11 @@ class Benchmark {
 
     // Start threads
     std::deque<std::thread> threads;
+    std::vector<std::stringstream *> thread_output;
     for(size_t i = 0; i < thread_count; ++i) {
-      threads.emplace_back(&Benchmark::entry, this, i, thread_count, affinity);
+	std::stringstream * s = new std::stringstream();
+	thread_output.push_back(s);
+      threads.emplace_back(&Benchmark::entry, this, i, thread_count, affinity, s);
     }
 
     // Wait for threads to be ready
@@ -133,6 +138,15 @@ class Benchmark {
     unique_dump_id = __rdtsc();
 
     VLOG(1) << "Benchmark stopped.";
+	
+	std::ofstream myfile;
+	myfile.open("raw_output.txt");
+	
+	for(size_t i = 0; i < thread_output.size(); ++i) {
+		myfile << thread_output[i]->str() << std::endl;
+		delete thread_output[i];
+	}
+	myfile.close();
 
     Dump(thread_count, end_ - start, unique_dump_id, true);
 
@@ -171,11 +185,11 @@ class Benchmark {
   /// of the ending time so the main thread can accurately determine how long
    /// the run took without polling aggressively and wasting a core.
   void entry(size_t thread_index, size_t thread_count,
-             AffinityPattern affinity) {
+             AffinityPattern affinity, std::stringstream * s = nullptr) {
     if(affinity != AffinityPattern::OSScheduled) {
       Environment::Get()->SetThreadAffinity(thread_index, affinity);
     }
-    Main(thread_index);
+    Main(thread_index, s);
     size_t previous =
       threads_finished_.fetch_add(1, std::memory_order_acq_rel);
     if(previous + 1 == thread_count) {
