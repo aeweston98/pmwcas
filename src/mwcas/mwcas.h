@@ -522,9 +522,9 @@ public:
   }
 
   /// Get value assuming epoch protection.
-  inline T GetValueProtected() {
+  inline T GetValueProtected(std::stringstream * ss = nullptr) {
 #ifdef PMEM
-    return GetValueProtectedPersistent();
+    return GetValueProtectedPersistent(ss);
 #else
     return GetValueProtectedVolatile();
 #endif
@@ -700,10 +700,14 @@ retry:
   }
 
   // The "protected" variant of GetPersistValue().
-  T GetValueProtectedPersistent() {
+  T GetValueProtectedPersistent(std::stringstream * ss = nullptr) {
     MwCASMetrics::AddRead();
 
-  retry:
+	//anchor1
+	//(*ss) << rdtsc() << "\tINV\t" << std::this_thread::get_id() << "\tR\t" <<  w->address_ << "\t" << w->old_value_ << "\n";
+  	//uint64_t * address = nullptr;
+	//uint64_t old_value = 0;
+retry:
     uint64_t val = (uint64_t)value_;
 #ifndef RTM
     if(val & kCondCASFlag) {
@@ -718,6 +722,10 @@ retry:
         *wd->status_address_ == Descriptor::kStatusUndecided ?
             dptr : wd->old_value_,
         val);
+
+	//address = wd->address_;
+	//old_value = wd->old_value_;
+
       goto retry;
     }
 #endif

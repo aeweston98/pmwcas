@@ -366,7 +366,7 @@ retry:
   if(IsCondCASDescriptorPtr(val)) {
 
 condcasdescriptor:
-    WordDescriptor* wd = (WordDescriptor*)CleanPtr(val);
+    /*WordDescriptor* wd = (WordDescriptor*)CleanPtr(val);
     uint64_t dptr = SetFlags(wd->GetDescriptor(), kMwCASFlag | dirty_flag);
     uint64_t desired = *wd->status_address_ == kStatusUndecided ? dptr : wd->old_value_;
 
@@ -379,7 +379,7 @@ condcasdescriptor:
         // Another competing operation succeeded, return
         return dptr;
       }
-    }
+    }*/
     // Retry this operation
     goto retry;
   }
@@ -399,7 +399,7 @@ mwcasdescriptor:
       //we have successfully installed the cond_descptr
       w->old_value_ = val;
 	if(s != nullptr) {
-     		(*s) << w->address_ << "," << w->old_value_ << "," << w->new_value_ << "," << rdtsc() << "\n";
+     		(*s) << rdtsc() << "\tINV\t" << std::this_thread::get_id() << "\tW\t" <<  w->address_ << "\t" << w->old_value_ << "\n";
 	}
 	 uint64_t mwcas_descptr = SetFlags(this, kMwCASFlag | dirty_flag);
       CompareExchange64(w->address_, status_ == kStatusUndecided ? mwcas_descptr : w->old_value_, cond_descptr);
@@ -688,7 +688,11 @@ retry_entry:
     wd->PersistAddress();
     RAW_CHECK(val & kDirtyFlag, "invalid final value");
     CompareExchange64(wd->address_, val & ~kDirtyFlag, val);
-  }
+	
+	if(s != nullptr){
+		(*s) << rdtsc() << "\tRES\t" << std::this_thread::get_id() << "\tW\t" <<  wd->address_ << "\t" << wd->new_value_ << "\n"; 
+	} 
+	}
 
   if(calldepth == 0) {
     return Cleanup();
