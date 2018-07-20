@@ -203,6 +203,8 @@ struct MwCas : public Benchmark {
     WaitForStart();
     const uint64_t kEpochThreshold = 100;
     uint64_t epochs = 0;
+	
+    uint32_t benchmark_counter = 0;
 
     descriptor_pool_->GetEpoch()->Protect();
     uint64_t n_success = 0;
@@ -224,15 +226,15 @@ struct MwCas : public Benchmark {
         }
         address[i] = reinterpret_cast<CasPtr*>(&test_array_[idx]);
         value[i] = test_array_[idx].GetValueProtected(ss);
-        CHECK(value[i] % (4 * FLAGS_array_size) >= 0 &&
-            (value[i] % (4 * FLAGS_array_size)) / 4 < FLAGS_array_size);
+        //CHECK(value[i] % (4 * FLAGS_array_size) >= 0 &&
+         //   (value[i] % (4 * FLAGS_array_size)) / 4 < FLAGS_array_size);
       }
 
       Descriptor* descriptor = descriptor_pool_->AllocateDescriptor();
       CHECK_NOTNULL(descriptor);
       for(uint64_t i = 0; i < FLAGS_word_count; i++) {
-        descriptor->AddEntry((uint64_t*)(address[i]), uint64_t(value[i]),
-            uint64_t(value[FLAGS_word_count - 1 - i] + 4 * FLAGS_array_size));
+        descriptor->AddEntry((uint64_t*)(address[i]), uint64_t(value[i]), uint64_t(benchmark_counter)); // uint64_t(value[FLAGS_word_count - 1 - i] + 4 * FLAGS_array_size));
+      	benchmark_counter++;
       }
       bool status = false;
       status = descriptor->MwCAS(0,ss);
