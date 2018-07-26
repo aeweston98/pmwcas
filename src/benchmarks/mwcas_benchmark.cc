@@ -233,7 +233,10 @@ struct MwCas : public Benchmark {
       Descriptor* descriptor = descriptor_pool_->AllocateDescriptor();
       CHECK_NOTNULL(descriptor);
       for(uint64_t i = 0; i < FLAGS_word_count; i++) {
-        descriptor->AddEntry((uint64_t*)(address[i]), uint64_t(value[i]), uint64_t(benchmark_counter)); // uint64_t(value[FLAGS_word_count - 1 - i] + 4 * FLAGS_array_size));
+         uint64_t tmp = (uint64_t) thread_index;
+	 tmp = tmp << 32;
+	if(ss != nullptr) { (*ss) << "->" << tmp << " to " << (tmp + benchmark_counter) << "\n";}
+	 descriptor->AddEntry((uint64_t*)(address[i]), uint64_t(value[i]), uint64_t(tmp  + benchmark_counter)); // uint64_t(value[FLAGS_word_count - 1 - i] + 4 * FLAGS_array_size));
       	benchmark_counter++;
       }
       bool status = false;
